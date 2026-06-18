@@ -58,7 +58,7 @@ async def get_playback(current_state: dict, card_config: dict) -> dict:
             })
             
         # 2. Fetch recently added movies and series
-        recent_url = f"{url}/Items?Limit=3&Recursive=true&IncludeItemTypes=Movie,Series&SortBy=DateCreated&SortOrder=Descending"
+        recent_url = f"{url}/Items?Limit=4&Recursive=true&IncludeItemTypes=Movie,Series&SortBy=DateCreated&SortOrder=Descending"
         recent_resp = await client.get(recent_url, headers=headers, timeout=2.0)
         recent_resp.raise_for_status()
         recent_items = recent_resp.json().get("Items", [])

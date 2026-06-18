@@ -3,6 +3,7 @@ import json
 import asyncio
 import logging
 import inspect
+import time
 import src.state as state
 
 logger = logging.getLogger("dashyy-backend")
@@ -49,6 +50,9 @@ async def run_extension_function(extension_str: str, current_state: dict, card_i
 
 # MARK: - Telemetry Main Async loop
 
+failure_counters = {}
+last_run_timestamps = {}
+
 async def metrics_broadcast_loop():
     """
     Background scheduler thread that executes layout card extensions and pushes live status updates
@@ -71,24 +75,45 @@ async def metrics_broadcast_loop():
                             
                             extension_str = card_config.get("extension")
                             if extension_str:
-                                current_state = state.card_data.get(card_id, {})
-                                result = await run_extension_function(
-                                    extension_str, 
-                                    current_state, 
-                                    card_id, 
-                                    card_config
-                                )
-                                state.card_data[card_id] = result
+                                # Get card-specific polling interval (default to 5s)
+                                poll_interval = float(card_config.get("pollInterval", 5.0))
+                                now = time.time()
+                                last_run = last_run_timestamps.get(card_id, 0.0)
+                                
+                                if now - last_run >= poll_interval:
+                                    current_state = state.card_data.get(card_id, {})
+                                    result = await run_extension_function(
+                                        extension_str, 
+                                        current_state, 
+                                        card_id, 
+                                        card_config
+                                    )
+                                    # Only update state if values actually changed or if recovering from an error
+                                    if current_state != result or "error" in current_state:
+                                        state.card_data[card_id] = result
+                                    
+                                    # Update last run timestamp & reset failures
+                                    last_run_timestamps[card_id] = now
+                                    failure_counters[card_id] = 0
                         except Exception as ext_err:
                             logger.error(f"Error running extension for card {card_id}: {ext_err}")
-                            # Keep user-friendly error message
-                            error_msg = str(ext_err)
-                            if "credentials not configured" in error_msg.lower():
-                                error_msg = "Credentials not configured"
-                            elif "connection failed" in error_msg.lower() or "unable to connect" in error_msg.lower():
-                                service_name = card_id.replace("_", " ").title()
-                                error_msg = f"Unable to connect to {service_name} service"
-                            state.card_data[card_id] = {"error": error_msg}
+                            
+                            # Increment failure counter
+                            cnt = failure_counters.get(card_id, 0) + 1
+                            failure_counters[card_id] = cnt
+                            
+                            # Only show connection failure in the UI if it fails 10 times continuously
+                            if cnt >= 10:
+                                error_msg = str(ext_err)
+                                if "credentials not configured" in error_msg.lower():
+                                    error_msg = "Credentials not configured"
+                                elif "connection failed" in error_msg.lower() or "unable to connect" in error_msg.lower():
+                                    service_name = card_id.replace("_", " ").title()
+                                    error_msg = f"Unable to connect to {service_name} service"
+                                state.card_data[card_id] = {"error": error_msg}
+                                
+                            # Prevent immediate retrying on failure on the next 1s tick
+                            last_run_timestamps[card_id] = time.time()
                             
             # Broadcast update packet to all active WS listeners
             await state.broadcast_update()
@@ -96,4 +121,5 @@ async def metrics_broadcast_loop():
         except Exception as e:
             logger.error(f"Error in metrics loop thread: {e}")
             
-        await asyncio.sleep(2.5)
+        # Global resolution tick (1.0s) to evaluate card-level pollInterval limits
+        await asyncio.sleep(1.0)
