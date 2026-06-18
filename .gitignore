@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# OS and IDE files
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Dynamic Extensions (user mounted or generated from default_extensions)
+extensions/
+
+# Configuration JSONs (to avoid committing credentials/passwords)
+config/cards/*.json
+config/dashboard.json
+
+Jenkinsfile

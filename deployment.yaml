@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashyy
+  labels:
+    app: dashyy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashyy
+  template:
+    metadata:
+      labels:
+        app: dashyy
+    spec:
+      containers:
+      - name: dashyy
+        image: 192.168.0.201:5000/dashyy:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        env:
+        - name: TZ
+          value: "Asia/Kolkata"
+        volumeMounts:
+        - name: dashyy-volume
+          mountPath: "/app/config"
+          subPath: "config"
+        - name: dashyy-volume
+          mountPath: "/app/extensions"
+          subPath: "extensions"
+
+      volumes:
+        - name: dashyy-volume
+          persistentVolumeClaim:
+            claimName: dashyy-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashyy
+  labels:
+    app: dashyy
+spec:
+  ports:
+  - port: 8000
+    targetPort: 8000
+  selector:
+    app: dashyy
+  type: ClusterIP
