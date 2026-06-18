@@ -33,7 +33,9 @@ async def get_status(current_state: dict, card_config: dict) -> dict:
         }
         update_resp = await client.post(json_url, json=update_payload, timeout=3.0)
         update_resp.raise_for_status()
-        torrents_dict = update_resp.json().get("result", {}).get("torrents", {})
+        
+        result = update_resp.json().get("result") or {}
+        torrents_dict = result.get("torrents") or {}
         
         torrents_list = []
         total_down_rate = 0.0

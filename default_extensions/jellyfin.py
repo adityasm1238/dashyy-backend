@@ -1,4 +1,5 @@
 import httpx
+import asyncio
 
 async def get_playback(current_state: dict, card_config: dict) -> dict:
     config = card_config.get("apiConfig", {})
@@ -57,8 +58,8 @@ async def get_playback(current_state: dict, card_config: dict) -> dict:
                 "imageUrl": image_url
             })
             
-        # 2. Fetch recently added movies and series
-        recent_url = f"{url}/Items?Limit=4&Recursive=true&IncludeItemTypes=Movie,Series&SortBy=DateCreated&SortOrder=Descending"
+        # 2. Fetch recently added movies, series, and episodes
+        recent_url = f"{url}/Items?Limit=4&Recursive=true&IncludeItemTypes=Movie,Series,Episode&SortBy=DateCreated&SortOrder=Descending"
         recent_resp = await client.get(recent_url, headers=headers, timeout=2.0)
         recent_resp.raise_for_status()
         recent_items = recent_resp.json().get("Items", [])
@@ -66,10 +67,11 @@ async def get_playback(current_state: dict, card_config: dict) -> dict:
         recently_added = []
         for item in recent_items:
             item_id = item.get("Id", "")
+            item_type = item.get("Type", "Movie")
             recently_added.append({
                 "id": item_id,
                 "title": item.get("Name", "Unknown Title"),
-                "type": "Series" if item.get("Type") == "Series" else "Movie",
+                "type": item_type,
                 "imageUrl": f"{url}/Items/{item_id}/Images/Primary" if item_id else ""
             })
             
@@ -91,3 +93,34 @@ async def handle_action(action: str, item_id: str, card_config: dict) -> None:
             headers = {"X-MediaBrowser-Token": api_key}
             resp = await client.post(play_url, headers=headers, timeout=5.0)
             resp.raise_for_status()
+
+async def get_library_stats(current_state: dict, card_config: dict) -> dict:
+    config = card_config.get("apiConfig", {})
+    url = config.get("url", "").rstrip("/")
+    api_key = config.get("apiKey", "")
+    if not url or "YOUR_" in api_key or not api_key:
+        raise ValueError("Jellyfin credentials not configured")
+        
+    headers = {"X-MediaBrowser-Token": api_key}
+    
+    async with httpx.AsyncClient() as client:
+        async def get_count(item_type: str) -> int:
+            resp = await client.get(
+                f"{url}/Items?IncludeItemTypes={item_type}&Recursive=true&Limit=0",
+                headers=headers,
+                timeout=3.0
+            )
+            resp.raise_for_status()
+            return resp.json().get("TotalRecordCount", 0)
+            
+        movies_count, series_count, episodes_count = await asyncio.gather(
+            get_count("Movie"),
+            get_count("Series"),
+            get_count("Episode")
+        )
+        
+        return {
+            "moviesCount": movies_count,
+            "seriesCount": series_count,
+            "episodesCount": episodes_count
+        }
