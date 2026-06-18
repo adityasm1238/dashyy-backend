@@ -23,13 +23,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Clean up compile packages to minimize image footprint
 RUN apk del .build-deps
 
-# Copy source, configurations, and default extensions
+# Copy source and default extensions
 COPY src/ ./src
-COPY config/ ./config
 COPY default_extensions/ ./default_extensions
 
-# Create empty extensions directory as mount point
-RUN mkdir -p extensions
+# Create empty extensions and config directories as mount points
+RUN mkdir -p extensions config
 
 # Copy and set entrypoint script
 COPY entrypoint.sh .

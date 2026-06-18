@@ -21,8 +21,7 @@ ENV/
 # Dynamic Extensions (user mounted or generated from default_extensions)
 extensions/
 
-# Configuration JSONs (to avoid committing credentials/passwords)
-config/cards/*.json
-config/dashboard.json
+# Local configurations (user custom files)
+config/
 
 Jenkinsfile
